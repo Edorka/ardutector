@@ -7,17 +7,24 @@
 #include <avr/power.h>
 #include <avr/wdt.h>
 #include <Wire.h>
-//#include <MMA7660.h>
 #define LED_PIN (13)
 #define HALL_PIN (2)
 
 volatile int f_wdt=1;
-
+int doorState = 0;
 void pinInterrupt(void)
 {
   sleep_disable(); 
   Serial.print("waked up on pin.");  //getMovement();   
-  //getMovement();
+  doorState = digitalRead(HALL_PIN);
+  if (doorState == HIGH){
+	
+     Serial.print("closed"); 
+  } else {
+	
+     Serial.print("open"); 
+  }
+
   detachInterrupt(0);
   f_wdt = 1;
 }
@@ -59,10 +66,11 @@ ISR(WDT_vect)
 void enterSleep(void)
 {
 
-    Serial.println("seel mode by WDT");
-  attachInterrupt(0, pinInterrupt, CHANGE);
+  Serial.println("sleep mode by WDT");
+  attachInterrupt(0, pinInterrupt, LOW);
   delay(100); //Allow for serial print to complete.
-  set_sleep_mode(SLEEP_MODE_PWR_SAVE);   /* EDIT: could also use SLEEP_MODE_PWR_DOWN for lowest power consumption. */
+  set_sleep_mode(SLEEP_MODE_PWR_DOWN);   
+  /* EDIT: could also use SLEEP_MODE_PWR_DOWN for lowest power consumption. */
   sleep_enable();
   
   /* Now enter sleep mode. */
@@ -93,11 +101,8 @@ void setup()
   Serial.begin(9600);
   Serial.println("Initialising...");
   delay(100); //Allow for serial print to complete.
-
-  //  MMA7660.init();
   pinMode(LED_PIN,OUTPUT);
   pinMode(HALL_PIN,INPUT);
-
   /*** Setup the WDT ***/
   
   /* Clear the reset flag. */
@@ -117,21 +122,7 @@ void setup()
   Serial.println("Initialisation complete.");
   delay(100); //Allow for serial print to complete.
 }
-
-/*
-void getMovement(void){
-  int x,y,z;
-
-  delay(100); // There will be new values every 100ms
-  MMA7660.getValues(&x,&y,&z);
-  Serial.print("x: ");
-  Serial.print(x);
-  Serial.print(" y: ");
-  Serial.print(y);
-  Serial.print(" z: ");
-  Serial.println(z);
-
-}*/ 
+ 
 /***************************************************
  *  Name:        enterSleep
  *
