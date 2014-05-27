@@ -8,21 +8,27 @@
 #include <avr/wdt.h>
 #include <Wire.h>
 #define LED_PIN (13)
-#define HALL_PIN (2)
+#define HALL_SENSOR_PIN (2)
+#define BT_POWER_PIN (3)
+#define SLEEP_TIMEOUT (30)
+
 
 volatile int f_wdt=1;
 int doorState = 0;
+int timeSleeping = 0;
 void pinInterrupt(void)
 {
   sleep_disable(); 
   Serial.print("waked up on pin.");  //getMovement();   
-  doorState = digitalRead(HALL_PIN);
+  doorState = digitalRead(HALL_SENSOR_PIN);
   if (doorState == HIGH){
 	
      Serial.print("closed"); 
+
+     digitalWrite(BT_POWER_PIN, LOW);
   } else {
-	
      Serial.print("open"); 
+     digitalWrite(BT_POWER_PIN, HIGH);
   }
 
   detachInterrupt(0);
@@ -42,6 +48,7 @@ void pinInterrupt(void)
  ***************************************************/
 ISR(WDT_vect)
 {
+  timeSleeping = timeSleeping + 8;
   if(f_wdt == 0)
   {
     f_wdt=1;
@@ -66,6 +73,7 @@ ISR(WDT_vect)
 void enterSleep(void)
 {
 
+     digitalWrite(BT_POWER_PIN, LOW);
   Serial.println("sleep mode by WDT");
   attachInterrupt(0, pinInterrupt, LOW);
   delay(100); //Allow for serial print to complete.
@@ -85,6 +93,11 @@ void enterSleep(void)
 
 
 
+void sendKeepAlive(){
+	digitalWrite(BT_POWER_PIN, HIGH);
+	Serial.print("KA"); delay(1000);
+}
+
 /***************************************************
  *  Name:        setup
  *
@@ -102,9 +115,28 @@ void setup()
   Serial.println("Initialising...");
   delay(100); //Allow for serial print to complete.
   pinMode(LED_PIN,OUTPUT);
-  pinMode(HALL_PIN,INPUT);
+  pinMode(HALL_SENSOR_PIN,INPUT);
+  pinMode(BT_POWER_PIN,OUTPUT);
+
+
+  /** Setup the bluetooth module **/
+
+digitalWrite(BT_POWER_PIN, HIGH);
+// Ahora se procede a la configuración del modulo:
+
+// Se inicia la configuración:
+Serial.print("AT"); delay(1000);
+
+// Se ajusta el nombre del Bluetooth:
+Serial.print("AT+NAME"); Serial.print("TECTO"); delay(1000);
+
+// Se ajustan los baudios:
+Serial.print("AT+BAUD"); Serial.print("9600"); delay(1000);
+
+// Se ajusta la contraseña:
+Serial.print("AT+PIN"); Serial.print("1234"); delay(1000); 
+
   /*** Setup the WDT ***/
-  
   /* Clear the reset flag. */
   MCUSR &= ~(1<<WDRF);
   
@@ -149,5 +181,10 @@ void loop()
   else
   {
     /* Do nothing. */
+  }
+  Serial.print(timeSleeping);
+  Serial.println("seconds sleeping");
+  if ( timeSleeping > SLEEP_TIMEOUT ){	
+     sendKeepAlive();
   }
 }
